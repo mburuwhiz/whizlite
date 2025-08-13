@@ -1,4 +1,3 @@
-// The 100% complete index.js file
 const {
     default: makeWASocket,
     useMultiFileAuthState,
@@ -22,10 +21,12 @@ const {
     setReminders 
 } = require('./src/utils/dbHandler');
 
+// --- GLOBAL VARIABLES ---
 const commands = new Map();
 const recentStatuses = new Map();
 const reactionEmojis = ['👍', '❤️', '🔥', '😮', '😂', '👏', '💯', '🙌'];
 
+// --- LOGGER LOGIC ---
 function showBanner() {
     const banner = figlet.textSync('WHIZLITE', { font: 'Standard', horizontalLayout: 'full' });
     console.log(gradient.pastel.multiline(banner));
@@ -46,6 +47,7 @@ function checkConfiguration() {
     return isOwnerSet;
 }
 
+// --- COMMAND HANDLER LOGIC ---
 async function loadCommands() {
     console.log(chalk.yellow('Loading commands...'));
     const commandFolders = fs.readdirSync(path.join(__dirname, './src/commands'));
@@ -64,19 +66,9 @@ async function loadCommands() {
     console.log(chalk.green(`${commands.size} commands loaded successfully!`));
 }
 
-async function handleStatusUpdate(sock, msg) {
-    if (msg.key.participant) recentStatuses.set(msg.key.participant, msg);
-    if (config.AUTO_VIEW_STATUS) await sock.readMessages([msg.key]);
-    if (config.AUTO_LIKE_STATUS) {
-        try {
-            const randomEmoji = reactionEmojis[Math.floor(Math.random() * reactionEmojis.length)];
-            await sock.sendMessage('status@broadcast', { react: { text: randomEmoji, key: msg.key } });
-        } catch (e) { console.error("Failed to react to status:", e); }
-    }
-}
-
 async function handleCommand(sock, msg) {
     if (!msg.message || msg.key.remoteJid === 'status@broadcast') return;
+
     let text = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || '';
     if (!text.startsWith(config.PREFIX)) return;
 
@@ -94,6 +86,19 @@ async function handleCommand(sock, msg) {
     }
 }
 
+// --- STATUS HANDLER LOGIC ---
+async function handleStatusUpdate(sock, msg) {
+    if (msg.key.participant) recentStatuses.set(msg.key.participant, msg);
+    if (config.AUTO_VIEW_STATUS) await sock.readMessages([msg.key]);
+    if (config.AUTO_LIKE_STATUS) {
+        try {
+            const randomEmoji = reactionEmojis[Math.floor(Math.random() * reactionEmojis.length)];
+            await sock.sendMessage('status@broadcast', { react: { text: randomEmoji, key: msg.key } });
+        } catch (e) { console.error("Failed to react to status:", e); }
+    }
+}
+
+// --- MAIN BOT LOGIC ---
 async function connectToWhatsApp() {
     showBanner();
     if (!checkConfiguration()) {
@@ -118,12 +123,35 @@ async function connectToWhatsApp() {
             qrcode.generate(qr, { small: true });
         }
         if (connection === 'open') {
+            const connectionTime = Date.now() - (global.startTime || Date.now());
             console.log(chalk.green.bold('\nWHIZLITE Connected Successfully!\n'));
-            sock.sendMessage(config.OWNER_NUMBER + '@s.whatsapp.net', { text: `Bot connected.` });
+            
+            const uptimeInSeconds = process.uptime();
+            const hours = Math.floor(uptimeInSeconds / 3600);
+            const minutes = Math.floor((uptimeInSeconds % 3600) / 60);
+            const seconds = Math.floor(uptimeInSeconds % 60);
+            const formattedUptime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            const statusBlock = `
+╭──「 *WHIZ LITE IS LIVE!* 」──╮
+│ 🧑‍💻 *Prefix:* ${config.PREFIX}
+│ 👤 *User:* ${config.OWNER_NAME}
+│ 📡 *Speed:* *${connectionTime}ms*
+│ ⏱️ *Uptime:* ${formattedUptime}
+╰─────────────────────╯`.trim();
+
+            const descriptionBlock = "Welcome to WHIZLITE ✨! Your friendly and smart WhatsApp companion. Packed with AI magic 🧠, fun games 🎮, and creative tools 🎨. Ready to make your chats sparkle! 🚀";
+
+            const fullWelcomeMessage = `${statusBlock}\n\n${descriptionBlock}`;
+            
+            sock.sendMessage(config.OWNER_NUMBER + '@s.whatsapp.net', { text: fullWelcomeMessage });
         }
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-            if (shouldReconnect) connectToWhatsApp();
+            if (shouldReconnect) {
+                console.log(chalk.red('Connection closed. Reconnecting...'));
+                connectToWhatsApp();
+            }
         }
     });
 
@@ -141,10 +169,48 @@ async function connectToWhatsApp() {
             return handleStatusUpdate(sock, msg);
         }
 
-        // ... rest of the logic
+        const contextInfo = msg.message.extendedTextMessage?.contextInfo;
+        const replyText = msg.message.conversation || msg.message.extendedTextMessage?.text;
+        if (contextInfo && contextInfo.participant === 'status@broadcast' && replyText?.toLowerCase().replace(config.PREFIX, '') === 'save') {
+            try {
+                const quotedMsg = contextInfo.quotedMessage;
+                const userJid = msg.key.remoteJid;
+                await sock.sendMessage(userJid, { react: { text: '📥', key: msg.key } });
+                if (quotedMsg.imageMessage) {
+                    const stream = await downloadContentFromMessage(quotedMsg.imageMessage, 'image');
+                    let buffer = Buffer.from([]);
+                    for await(const chunk of stream) { buffer = Buffer.concat([buffer, chunk]); }
+                    await sock.sendMessage(userJid, { image: buffer, caption: quotedMsg.imageMessage.caption || '' });
+                } else if (quotedMsg.videoMessage) {
+                    const stream = await downloadContentFromMessage(quotedMsg.videoMessage, 'video');
+                    let buffer = Buffer.from([]);
+                    for await(const chunk of stream) { buffer = Buffer.concat([buffer, chunk]); }
+                    await sock.sendMessage(userJid, { video: buffer, caption: quotedMsg.videoMessage.caption || '' });
+                } else {
+                    const statusText = quotedMsg.extendedTextMessage.text;
+                    await sock.sendMessage(userJid, { text: `*Saved Status:*\n\n${statusText}` });
+                }
+                return;
+            } catch (e) { console.error("Error in save command:", e); return; }
+        }
+
+        if (msg.key.remoteJid.endsWith('@g.us')) {
+            try {
+                const settings = getChatSettings(msg.key.remoteJid);
+                const text = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || '';
+                const groupMetadata = await sock.groupMetadata(msg.key.remoteJid);
+                const sender = groupMetadata.participants.find(p => p.id === msg.key.participant);
+                const senderIsAdmin = sender && (sender.admin === 'admin' || sender.admin === 'superadmin');
+                if (settings.antilink && !senderIsAdmin && /(https?:\/\/[^\s]+)/gi.test(text)) { await sock.sendMessage(msg.key.remoteJid, { delete: msg.key }); return; }
+                if (settings.antiword.enabled && !senderIsAdmin && settings.antiword.words.some(word => new RegExp(`\\b${word}\\b`, 'i').test(text))) { await sock.sendMessage(msg.key.remoteJid, { delete: msg.key }); return; }
+            } catch (e) { console.error("Error in moderation check:", e); }
+        }
+        
         handleCommand(sock, msg);
     });
 }
 
+global.startTime = Date.now();
 connectToWhatsApp();
+
 module.exports = { commands };
