@@ -1,0 +1,11 @@
+{
+  "functions": {
+    "api/bot.js": {
+      "maxDuration": 300,
+      "memory": 1024
+    }
+  },
+  "redirects": [
+    { "source": "/", "destination": "https://github.com/mburuwhiz/whizlite" }
+  ]
+}

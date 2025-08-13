@@ -1,0 +1,58 @@
+# ===============================================================
+# |       WHIZLITE Deployment Blueprint for Render.com          |
+# ===============================================================
+services:
+  - type: worker
+    name: whizlite-bot
+    env: node
+    plan: free # Can be changed to a paid plan for more power
+    region: frankfurt # Optional: choose a region closer to you
+    
+    # Build and Start Commands
+    buildCommand: "npm install --legacy-peer-deps"
+    startCommand: "node index.js"
+    
+    # Environment Variables
+    # Non-secrets can have a value.
+    # Secrets MUST have 'sync: false' so you can set them safely in the dashboard.
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: PREFIX
+        value: "."
+        
+      # --- AUTOMATION MASTER CONTROLS ---
+      - key: AUTO_VIEW_STATUS
+        value: true
+      - key: AUTO_LIKE_STATUS
+        value: true
+      - key: ENABLE_WELCOME_GOODBYE
+        value: true
+      - key: ENABLE_AUTOREPLY
+        value: true
+      - key: ENABLE_AUTOREACT
+        value: true
+        
+      # --- BOT SECRETS (Set these in the Render Dashboard) ---
+      - key: OWNER_NUMBER
+        sync: false
+      - key: OWNER_NAME
+        sync: false
+      - key: SESSION_ID
+        sync: false
+        
+      # --- API KEY SECRETS (Set these in the Render Dashboard) ---
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENWEATHER_API_KEY
+        sync: false
+      - key: REMOVEBG_API_KEY
+        sync: false
+      - key: CURRENCY_API_KEY
+        sync: false
+      - key: PEXELS_API_KEY
+        sync: false
+      - key: DEEPAI_API_KEY
+        sync: false
+      - key: DEEPL_API_KEY
+        sync: false

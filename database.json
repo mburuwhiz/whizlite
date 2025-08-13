@@ -1,0 +1,50 @@
+{
+  "chats": {
+    "120363401707408411@g.us": {
+      "antilink": false,
+      "antiword": {
+        "enabled": false,
+        "words": []
+      },
+      "bannedUsers": [],
+      "rules": "No rules have been set for this group yet.",
+      "welcome": {
+        "enabled": false,
+        "message": "Welcome @user to {group_name}!"
+      },
+      "goodbye": {
+        "enabled": false,
+        "message": "Goodbye @user, we'll miss you!"
+      },
+      "autoreply": {
+        "enabled": false,
+        "message": "Hi, I am WHIZLITE. How can I help you?"
+      },
+      "autoreact": {
+        "enabled": false,
+        "reactions": {}
+      }
+    }
+  },
+  "notes": {},
+  "reminders": [],
+  "commandStats": {
+    "ping": 11,
+    "menu": 6,
+    "test": 1,
+    "say": 1,
+    "help": 6,
+    "img": 1,
+    "image": 1,
+    "glitch": 2,
+    "wanted": 5,
+    "kick": 3,
+    "whois": 2,
+    "blur": 2,
+    "wasted": 1,
+    "selfieai": 1,
+    "toimage": 1,
+    "triggered": 1
+  },
+  "faqs": []
+}
