@@ -13,6 +13,7 @@ const gradient = require('gradient-string');
 const figlet = require('figlet');
 const boxen = require('boxen');
 const Table = require('cli-table3');
+const express = require('express');
 const config = require('./src/config');
 const { 
     logCommand, 
@@ -216,34 +217,20 @@ async function connectToWhatsApp() {
         
         handleCommand(sock, msg);
     });
-
-    sock.ev.on('group-participants.update', async (update) => {
-        const { id, participants, action } = update;
-        const settings = getChatSettings(id);
-        
-        try {
-            const botId = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-            const groupMetadata = await sock.groupMetadata(id);
-            const botIsAdmin = groupMetadata.participants.find(p => p.id === botId)?.admin;
-            if (!botIsAdmin) return;
-
-            if (config.ENABLE_WELCOME_GOODBYE) {
-                for (const participant of participants) {
-                    if (action === 'add' && settings.welcome.enabled) {
-                        const welcomeMsg = settings.welcome.message.replace(/@user/g, `@${participant.split('@')[0]}`).replace(/{group_name}/g, groupMetadata.subject);
-                        await sock.sendMessage(id, { text: welcomeMsg, mentions: [participant] });
-                    }
-                    if (action === 'remove' && settings.goodbye.enabled) {
-                        const goodbyeMsg = settings.goodbye.message.replace(/@user/g, `@${participant.split('@')[0]}`).replace(/{group_name}/g, groupMetadata.subject);
-                        await sock.sendMessage(id, { text: goodbyeMsg, mentions: [participant] });
-                    }
-                }
-            }
-        } catch (e) { console.error("Error in group-participants.update:", e); }
-    });
 }
 
+// Store start time globally to calculate connection speed
 global.startTime = Date.now();
 connectToWhatsApp();
+
+// --- Dummy Express Server for Render Web Service ---
+const app = express();
+const PORT = process.env.PORT || 3000;
+app.get('/', (req, res) => {
+    res.send('<h1>WHIZLITE Bot is running! 🚀</h1><p>The bot is active on WhatsApp. This page is just to satisfy hosting requirements.</p>');
+});
+app.listen(PORT, () => {
+    console.log(chalk.green(`Server started on port ${PORT}. Bot is ready!`));
+});
 
 module.exports = { commands };
