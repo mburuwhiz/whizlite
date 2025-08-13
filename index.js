@@ -68,7 +68,6 @@ async function loadCommands() {
 
 async function handleCommand(sock, msg) {
     if (!msg.message || msg.key.remoteJid === 'status@broadcast') return;
-
     let text = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || '';
     if (!text.startsWith(config.PREFIX)) return;
 
@@ -98,6 +97,25 @@ async function handleStatusUpdate(sock, msg) {
     }
 }
 
+// --- REMINDER SCHEDULER ---
+function startReminderChecker(sock) {
+    console.log(chalk.green('Reminder checker started.'));
+    setInterval(async () => {
+        try {
+            const reminders = getReminders();
+            const now = Date.now();
+            const dueReminders = reminders.filter(r => r.time <= now);
+            if (dueReminders.length > 0) {
+                for (const reminder of dueReminders) {
+                    await sock.sendMessage(reminder.userJid, { text: `🔔 *Reminder:* ${reminder.reason}` });
+                }
+                const remainingReminders = reminders.filter(r => r.time > now);
+                setReminders(remainingReminders);
+            }
+        } catch (e) { console.error("Error checking reminders:", e); }
+    }, 60000);
+}
+
 // --- MAIN BOT LOGIC ---
 async function connectToWhatsApp() {
     showBanner();
@@ -125,33 +143,21 @@ async function connectToWhatsApp() {
         if (connection === 'open') {
             const connectionTime = Date.now() - (global.startTime || Date.now());
             console.log(chalk.green.bold('\nWHIZLITE Connected Successfully!\n'));
+            startReminderChecker(sock);
             
-            const uptimeInSeconds = process.uptime();
-            const hours = Math.floor(uptimeInSeconds / 3600);
-            const minutes = Math.floor((uptimeInSeconds % 3600) / 60);
-            const seconds = Math.floor(uptimeInSeconds % 60);
-            const formattedUptime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            
-            const statusBlock = `
-╭──「 *WHIZ LITE IS LIVE!* 」──╮
-│ 🧑‍💻 *Prefix:* ${config.PREFIX}
-│ 👤 *User:* ${config.OWNER_NAME}
-│ 📡 *Speed:* *${connectionTime}ms*
-│ ⏱️ *Uptime:* ${formattedUptime}
-╰─────────────────────╯`.trim();
-
-            const descriptionBlock = "Welcome to WHIZLITE ✨! Your friendly and smart WhatsApp companion. Packed with AI magic 🧠, fun games 🎮, and creative tools 🎨. Ready to make your chats sparkle! 🚀";
-
-            const fullWelcomeMessage = `${statusBlock}\n\n${descriptionBlock}`;
-            
-            sock.sendMessage(config.OWNER_NUMBER + '@s.whatsapp.net', { text: fullWelcomeMessage });
+            setTimeout(() => {
+                const uptimeInSeconds = process.uptime();
+                const hours = Math.floor(uptimeInSeconds / 3600), minutes = Math.floor((uptimeInSeconds % 3600) / 60), seconds = Math.floor(uptimeInSeconds % 60);
+                const formattedUptime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                const statusBlock = `╭──「 *WHIZ LITE IS LIVE!* 」──╮\n│ 🧑‍💻 *Prefix:* ${config.PREFIX}\n│ 👤 *User:* ${config.OWNER_NAME}\n│ 📡 *Speed:* *${connectionTime}ms*\n│ ⏱️ *Uptime:* ${formattedUptime}\n╰─────────────────────╯`.trim();
+                const descriptionBlock = "Welcome to WHIZLITE ✨! Your friendly and smart WhatsApp companion. Packed with AI magic 🧠, fun games 🎮, and creative tools 🎨. Ready to make your chats sparkle! 🚀";
+                const fullWelcomeMessage = `${statusBlock}\n\n${descriptionBlock}`;
+                sock.sendMessage(config.OWNER_NUMBER + '@s.whatsapp.net', { text: fullWelcomeMessage });
+            }, 1500);
         }
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-            if (shouldReconnect) {
-                console.log(chalk.red('Connection closed. Reconnecting...'));
-                connectToWhatsApp();
-            }
+            if (shouldReconnect) connectToWhatsApp();
         }
     });
 
@@ -160,9 +166,11 @@ async function connectToWhatsApp() {
         if (!msg || !msg.message) return;
 
         const senderJid = msg.key.participant || msg.key.remoteJid;
-        const senderNumber = senderJid ? senderJid.split('@')[0] : '';
-        if (config.BOT_MODE === 'private' && senderNumber !== config.OWNER_NUMBER) {
-            return;
+        const ownerJid = config.OWNER_NUMBER + '@s.whatsapp.net';
+        if (config.BOT_MODE === 'private') {
+            if (senderJid !== ownerJid || msg.key.remoteJid !== ownerJid) {
+                return;
+            }
         }
 
         if (msg.key.remoteJid === 'status@broadcast') {
@@ -194,7 +202,7 @@ async function connectToWhatsApp() {
             } catch (e) { console.error("Error in save command:", e); return; }
         }
 
-        if (msg.key.remoteJid.endsWith('@g.us')) {
+        if (msg.key.remoteJid.endsWith('@g.us') && !msg.key.fromMe) {
             try {
                 const settings = getChatSettings(msg.key.remoteJid);
                 const text = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || '';
@@ -207,6 +215,31 @@ async function connectToWhatsApp() {
         }
         
         handleCommand(sock, msg);
+    });
+
+    sock.ev.on('group-participants.update', async (update) => {
+        const { id, participants, action } = update;
+        const settings = getChatSettings(id);
+        
+        try {
+            const botId = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+            const groupMetadata = await sock.groupMetadata(id);
+            const botIsAdmin = groupMetadata.participants.find(p => p.id === botId)?.admin;
+            if (!botIsAdmin) return;
+
+            if (config.ENABLE_WELCOME_GOODBYE) {
+                for (const participant of participants) {
+                    if (action === 'add' && settings.welcome.enabled) {
+                        const welcomeMsg = settings.welcome.message.replace(/@user/g, `@${participant.split('@')[0]}`).replace(/{group_name}/g, groupMetadata.subject);
+                        await sock.sendMessage(id, { text: welcomeMsg, mentions: [participant] });
+                    }
+                    if (action === 'remove' && settings.goodbye.enabled) {
+                        const goodbyeMsg = settings.goodbye.message.replace(/@user/g, `@${participant.split('@')[0]}`).replace(/{group_name}/g, groupMetadata.subject);
+                        await sock.sendMessage(id, { text: goodbyeMsg, mentions: [participant] });
+                    }
+                }
+            }
+        } catch (e) { console.error("Error in group-participants.update:", e); }
     });
 }
 
