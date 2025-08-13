@@ -1,0 +1,87 @@
+{
+  "name": "WHIZLITE Bot",
+  "description": "A powerful, multi-purpose WhatsApp bot built with Node.js and Baileys.",
+  "repository": "https://github.com/mburuwhiz/whizlite",
+  "logo": "https://i.ibb.co/L5rrb2p/whiz-logo-placeholder.png",
+  "keywords": ["whatsapp", "bot", "nodejs", "baileys", "whizlite"],
+  "website": "https://github.com/mburuwhiz",
+  "stack": "heroku-22",
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ],
+  "formation": {
+    "worker": {
+      "quantity": 1,
+      "size": "eco"
+    }
+  },
+  "env": {
+    "PREFIX": {
+      "description": "The prefix your bot will respond to (e.g., . ! # /).",
+      "value": ".",
+      "required": true
+    },
+    "OWNER_NUMBER": {
+      "description": "Your WhatsApp number (without +, e.g., 254712345678). The bot will recognize you as the owner.",
+      "value": "",
+      "required": true
+    },
+    "OWNER_NAME": {
+      "description": "Your name, which will be displayed in the menu.",
+      "value": "Whiz Tech",
+      "required": true
+    },
+    "BOT_MODE": {
+      "description": "Set the bot's mode. 'public' allows anyone to use it, 'private' restricts it to the owner.",
+      "value": "public",
+      "required": true
+    },
+    "SESSION_ID": {
+      "description": "Your Baileys Session ID. This is MANDATORY for Heroku deployment. Get it from https://whizlitesessions.zone.id",
+      "value": "",
+      "required": true
+    },
+    "AUTO_VIEW_STATUS": {
+      "description": "Set to 'true' to automatically view contacts' statuses.",
+      "value": "true"
+    },
+    "AUTO_LIKE_STATUS": {
+      "description": "Set to 'true' to automatically react to contacts' statuses.",
+      "value": "true"
+    },
+    "ENABLE_WELCOME_GOODBYE": {
+      "description": "Master switch for welcome/goodbye messages. Set to 'true' or 'false'.",
+      "value": "true"
+    },
+    "ENABLE_AUTOREPLY": {
+      "description": "Master switch for auto-reply on mention. Set to 'true' or 'false'.",
+      "value": "true"
+    },
+    "ENABLE_AUTOREACT": {
+      "description": "Master switch for auto-reaction to keywords. Set to 'true' or 'false'.",
+      "value": "true"
+    },
+    "OPENAI_API_KEY": {
+      "description": "(Optional) Your API key from OpenAI for AI features.",
+      "value": "",
+      "required": false
+    },
+    "REMOVEBG_API_KEY": {
+      "description": "(Optional) Your API key from remove.bg for background removal.",
+      "value": "",
+      "required": false
+    },
+    "PEXELS_API_KEY": {
+      "description": "(Optional) Your API key from Pexels.com for image search.",
+      "value": "",
+      "required": false
+    },
+    "DEEPAI_API_KEY": {
+      "description": "(Optional) Your API key from DeepAI.org for AI image effects.",
+      "value": "",
+      "required": false
+    }
+  }
+}
